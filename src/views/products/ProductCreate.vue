@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, onMounted } from 'vue'
 import { useProductStore } from '@/stores/productStore'
+import { useCategoryStore } from '@/stores/categoryStore' // Importamos el store de categorías
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,9 +10,9 @@ import { Loader2, ArrowLeft, Save } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 
 const store = useProductStore()
+const categoryStore = useCategoryStore() // Instanciamos el store
 const router = useRouter()
 
-// 1. Estado del Formulario con tu estructura exacta
 const form = reactive({
   name: '',
   description: '',
@@ -20,17 +21,19 @@ const form = reactive({
   category_id: null as number | null,
 })
 
+// Cargar categorías al montar el componente
+onMounted(() => {
+  categoryStore.fetchCategories()
+})
+
 const handleSubmit = async () => {
-  // --- REQUERIMIENTOS DE VALIDACIÓN ---
   if (!form.name.trim()) return toast.warning('El nombre es obligatorio')
   if (!form.category_id) return toast.warning('Debes seleccionar una categoría')
   if (form.price <= 0) return toast.warning('El precio debe ser mayor a 0')
   if (form.stock < 0) return toast.warning('El stock no puede ser negativo')
 
   const success = await store.createProduct(form)
-
   if (success) {
-    // Redirigir al listado tras el éxito
     router.push('/products')
   }
 }
@@ -56,11 +59,7 @@ const handleSubmit = async () => {
 
         <div class="grid gap-2">
           <Label for="description">Descripción</Label>
-          <Input
-            id="description"
-            v-model="form.description"
-            placeholder="Detalles del producto..."
-          />
+          <Input id="description" v-model="form.description" placeholder="Detalles del producto..." />
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -77,16 +76,30 @@ const handleSubmit = async () => {
 
         <div class="grid gap-2">
           <Label for="category">Categoría</Label>
-          <select
-            v-model.number="form.category_id"
-            id="category"
-            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            <option :value="null" disabled>Selecciona una categoría</option>
-            <option :value="1">Polos</option>
-            <option :value="2">Pantalones</option>
-            <option :value="3">Accesorios</option>
-          </select>
+          <div class="relative">
+            <select
+              v-model.number="form.category_id"
+              id="category"
+              :disabled="categoryStore.loading"
+              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
+            >
+              <option :value="null" disabled>
+                {{ categoryStore.loading ? 'Cargando categorías...' : 'Selecciona una categoría' }}
+              </option>
+
+              <option
+                v-for="cat in categoryStore.categories"
+                :key="cat.id"
+                :value="cat.id"
+              >
+                {{ cat.name }}
+              </option>
+            </select>
+
+            <div v-if="categoryStore.loading" class="absolute right-3 top-2">
+              <Loader2 class="h-5 w-5 animate-spin text-slate-400" />
+            </div>
+          </div>
         </div>
 
         <div class="pt-4">
